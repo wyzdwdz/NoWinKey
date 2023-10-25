@@ -8,7 +8,7 @@ namespace NoWinKey
 {
     internal static class Program
     {
-        private static Mutex mutex;
+        private static Mutex s_mutex;
 
         /// <summary>
         /// The main entry point for the application.
@@ -23,15 +23,15 @@ namespace NoWinKey
 
                 Application.Run(new TrayApplicationContext());
 
-                mutex.ReleaseMutex();
+                s_mutex.ReleaseMutex();
             }
         }
 
-        public static bool IsSingleInstance()
+        private static bool IsSingleInstance()
         {
             string mutexName = "NoWinKey";
 
-            mutex = new Mutex(true, mutexName, out bool createNew);
+            s_mutex = new Mutex(true, mutexName, out bool createNew);
 
             return createNew;
         }
@@ -39,44 +39,44 @@ namespace NoWinKey
 
     public class TrayApplicationContext : ApplicationContext
     {
-        private readonly NotifyIcon trayIcon;
-        private bool isStarted = true;
-        private readonly DisableWinKey runner;
+        private readonly NotifyIcon _trayIcon;
+        private bool _isStarted = true;
+        private readonly DisableWinKey _runner;
 
         public TrayApplicationContext()
         {
-            trayIcon = new NotifyIcon()
+            _trayIcon = new NotifyIcon()
             {
                 Icon = Resources.NoWinIcon,
                 ContextMenu = new ContextMenu(new MenuItem[] {
-                new MenuItem("Toggle", Toggle),
-                new MenuItem("Exit", Exit)
-            }),
+                    new MenuItem("Toggle", OnToggle),
+                    new MenuItem("Exit", OnExit)
+                }),
                 Visible = true
             };
 
-            runner = new DisableWinKey();
+            _runner = new DisableWinKey();
         }
 
-        void Toggle(object sender, EventArgs e)
+        private void OnToggle(object sender, EventArgs e)
         {
-            if (isStarted)
+            if (_isStarted)
             {
-                trayIcon.Icon = Resources.WinIcon;
-                runner.Stop();
+                _trayIcon.Icon = Resources.WinIcon;
+                _runner.Stop();
             }
             else
             {
-                trayIcon.Icon = Resources.NoWinIcon;
-                runner.Start();
+                _trayIcon.Icon = Resources.NoWinIcon;
+                _runner.Start();
             }
 
-            isStarted = !isStarted;
+            _isStarted = !_isStarted;
         }
 
-        void Exit(object sender, EventArgs e)
+        private void OnExit(object sender, EventArgs e)
         {
-            trayIcon.Visible = false;
+            _trayIcon.Visible = false;
 
             Application.Exit();
         }
@@ -89,7 +89,7 @@ namespace NoWinKey
         private const int VK_RWIN = 0x5C;
         private const int WM_KEYDOWN = 0x0100;
 
-        private static IntPtr _hookID = IntPtr.Zero;
+        private static IntPtr s_hookID = IntPtr.Zero;
 
         private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
@@ -116,7 +116,7 @@ namespace NoWinKey
                 }
             }
 
-            return CallNextHookEx(_hookID, nCode, wParam, lParam);
+            return CallNextHookEx(s_hookID, nCode, wParam, lParam);
         }
 
         private static IntPtr SetHook(LowLevelKeyboardProc proc)
@@ -135,12 +135,12 @@ namespace NoWinKey
 
         public void Start()
         {
-            _hookID = SetHook(HookCallback);
+            s_hookID = SetHook(HookCallback);
         }
 
         public void Stop()
         {
-            UnhookWindowsHookEx(_hookID);
+            UnhookWindowsHookEx(s_hookID);
         }
     }
 }
